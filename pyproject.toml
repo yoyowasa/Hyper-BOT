@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "hyper-bot"
+version = "0.1.0"
+description = "Hyperliquid bot scaffold (REST/WS, data, backtest)"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{ include = "hyper_bot" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = ">=2.32.3"
+websockets = ">=12.0"
+pandas = ">=2.2.2"
+numpy = ">=1.26.4"
+python-dateutil = ">=2.9.0.post0"
+tenacity = ">=8.5.0"
+loguru = ">=0.7.2"
+urllib3 = ">=2.2.2"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.8.0"
+isort = "^5.13.2"
+pytest = "^8.3.2"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
