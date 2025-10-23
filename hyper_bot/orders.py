@@ -64,3 +64,14 @@ def schedule_cancel_body(seconds_from_now: int) -> Dict[str, Any]:
     """DMS（Dead Man's Switch）予約用のペイロードを返す。"""
 
     return {"type": "scheduleCancel", "secs": seconds_from_now}
+
+
+def notional_ok(size: float, price: Optional[float], min_notional: float = 10.0) -> bool:
+    """最小発注金額（USD）に達しているかを判定する。
+
+    price が None の場合は判定不能のため True を返す（呼び出し元で警告推奨）。
+    """
+
+    if price is None:
+        return True
+    return (abs(size) * float(price)) >= float(min_notional)
