@@ -3,7 +3,7 @@ from __future__ import annotations
 """Hyperliquid の REST クライアント。
 
 - /info 系 API のラッパ
-- /exchange 系 API（注文・取消・DMS）のラッパ
+- /exchange 系 API（注文・取消・DMS）のラッパ（L1 署名方式）
 - ノンス管理と署名コールバックの受け口
 """
 
@@ -16,6 +16,7 @@ from loguru import logger
 
 from . import config
 from .nonce_manager import NonceManager
+from .signing import build_exchange_payload, sign_exchange_action
 
 
 class HyperliquidREST:
@@ -85,57 +86,96 @@ class HyperliquidREST:
 
     # /exchange endpoints -----------------------------------------------------
 
-    def post_orders(self, orders: List[Dict[str, Any]], signature_cb=None) -> Any:
-        """注文をバッチ送信。
+    def post_orders(
+        self,
+        orders: List[Dict[str, Any]],
+        signature_cb=None,
+        *,
+        grouping: str = "na",
+        is_mainnet: Optional[bool] = None,
+    ) -> Any:
+        """注文をバッチ送信（L1 署名）。
 
-        署名が必要な場合は `signature_cb(payload, nonce) -> signature` を渡してください。
-        API ウォレット（エージェント）による署名が必須です。
+        - orders: 事前に Tick/szDecimals 丸め済みの "OrderWire" 形式を想定（a/b/p/s/r/t/c）。
+        - grouping: "na" | "normalTpsl" | "positionTpsl"
+        - signature_cb: (action:dict, nonce:int)-> {r,s,v} を返す関数。省略時は環境変数の鍵で署名。
         """
 
-        body: Dict[str, Any] = {
-            "type": "order",
-            "orders": orders,
-        }
-        if signature_cb is not None:
-            nonce = self.nonce_mgr.next()
-            sig = signature_cb(body, nonce)
-            body["nonce"] = nonce
-            body["signature"] = sig
-        logger.debug("POST /exchange 送信: {}", body)
+        action: Dict[str, Any] = {"type": "order", "orders": orders, "grouping": grouping}
+        network = (os.getenv("HL_NETWORK", "mainnet")).lower()
+        is_mainnet_flag = is_mainnet if is_mainnet is not None else (network == "mainnet")
+        nonce = self.nonce_mgr.next()
+        if signature_cb is None:
+            priv = os.getenv("HL_PRIVATE_KEY")
+            if not priv:
+                raise RuntimeError("HL_PRIVATE_KEY が未設定です。署名コールバックを渡すか、環境変数を設定してください。")
+            sig = sign_exchange_action(action, priv, nonce, is_mainnet=is_mainnet_flag)
+            body = build_exchange_payload(action, sig)
+        else:
+            vrs = signature_cb(action, nonce)
+            sig = {"r": vrs["r"], "s": vrs["s"], "v": vrs["v"]}
+            body = {"action": action, "nonce": nonce, "signature": sig}
+        logger.debug("POST /exchange: {}", body)
         return self._post("/exchange", body)
 
     def cancel(self, oid: int, signature_cb=None) -> Any:
-        """注文 ID を指定してキャンセル。"""
+        """注文 ID を指定してキャンセル（L1 署名）。"""
 
-        body: Dict[str, Any] = {"type": "cancel", "oid": oid}
-        if signature_cb is not None:
-            nonce = self.nonce_mgr.next()
-            sig = signature_cb(body, nonce)
-            body["nonce"] = nonce
-            body["signature"] = sig
+        action: Dict[str, Any] = {"type": "cancel", "oid": oid}
+        network = (os.getenv("HL_NETWORK", "mainnet")).lower()
+        is_mainnet_flag = network == "mainnet"
+        nonce = self.nonce_mgr.next()
+        if signature_cb is None:
+            priv = os.getenv("HL_PRIVATE_KEY")
+            if not priv:
+                raise RuntimeError("HL_PRIVATE_KEY が未設定です。署名コールバックを渡すか、環境変数を設定してください。")
+            sig = sign_exchange_action(action, priv, nonce, is_mainnet=is_mainnet_flag)
+            body = build_exchange_payload(action, sig)
+        else:
+            vrs = signature_cb(action, nonce)
+            body = {"action": action, "nonce": nonce, "signature": vrs}
         return self._post("/exchange", body)
 
     def cancel_by_cloid(self, cloid: str, signature_cb=None) -> Any:
-        """クライアント ID（cloid）を指定してキャンセル。"""
+        """クライアント ID（cloid）を指定してキャンセル（L1 署名）。"""
 
-        body: Dict[str, Any] = {"type": "cancelByCloid", "cloid": cloid}
-        if signature_cb is not None:
-            nonce = self.nonce_mgr.next()
-            sig = signature_cb(body, nonce)
-            body["nonce"] = nonce
-            body["signature"] = sig
+        action: Dict[str, Any] = {"type": "cancelByCloid", "cloid": cloid}
+        network = (os.getenv("HL_NETWORK", "mainnet")).lower()
+        is_mainnet_flag = network == "mainnet"
+        nonce = self.nonce_mgr.next()
+        if signature_cb is None:
+            priv = os.getenv("HL_PRIVATE_KEY")
+            if not priv:
+                raise RuntimeError("HL_PRIVATE_KEY が未設定です。署名コールバックを渡すか、環境変数を設定してください。")
+            sig = sign_exchange_action(action, priv, nonce, is_mainnet=is_mainnet_flag)
+            body = build_exchange_payload(action, sig)
+        else:
+            vrs = signature_cb(action, nonce)
+            body = {"action": action, "nonce": nonce, "signature": vrs}
+        return self._post("/exchange", body)
+
+    def schedule_cancel_at(self, cancel_time_ms: int, signature_cb=None) -> Any:
+        """DMS（Dead Man's Switch）を絶対時刻（UTC ミリ秒）で予約（L1 署名）。"""
+
+        action: Dict[str, Any] = {"type": "scheduleCancel", "time": int(cancel_time_ms)}
+        network = (os.getenv("HL_NETWORK", "mainnet")).lower()
+        is_mainnet_flag = network == "mainnet"
+        nonce = self.nonce_mgr.next()
+        if signature_cb is None:
+            priv = os.getenv("HL_PRIVATE_KEY")
+            if not priv:
+                raise RuntimeError("HL_PRIVATE_KEY が未設定です。署名コールバックを渡すか、環境変数を設定してください。")
+            sig = sign_exchange_action(action, priv, nonce, is_mainnet=is_mainnet_flag)
+            body = build_exchange_payload(action, sig)
+        else:
+            vrs = signature_cb(action, nonce)
+            body = {"action": action, "nonce": nonce, "signature": vrs}
         return self._post("/exchange", body)
 
     def schedule_cancel(self, seconds_from_now: int, signature_cb=None) -> Any:
-        """DMS（Dead Man's Switch）を予約する。
+        """後方互換: 秒指定。内部で現在時刻に加算して schedule_cancel_at を呼ぶ。"""
+        import time as _t
 
-        現在時刻 +5 秒以上、1 日 10 回まで（UTC 00:00 リセット）。
-        """
+        target = int(_t.time() * 1000) + int(seconds_from_now * 1000)
+        return self.schedule_cancel_at(target, signature_cb)
 
-        body: Dict[str, Any] = {"type": "scheduleCancel", "secs": seconds_from_now}
-        if signature_cb is not None:
-            nonce = self.nonce_mgr.next()
-            sig = signature_cb(body, nonce)
-            body["nonce"] = nonce
-            body["signature"] = sig
-        return self._post("/exchange", body)

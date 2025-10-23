@@ -6,3 +6,6 @@ python-dateutil>=2.9.0.post0
 tenacity>=8.5.0
 loguru>=0.7.2
 urllib3>=2.2.2
+eth-account>=0.10.0
+eth-utils>=4.1.0
+msgpack>=1.0.8

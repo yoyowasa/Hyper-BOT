@@ -21,7 +21,7 @@ from loguru import logger
 from hyper_bot.metadata import MetadataResolver
 from hyper_bot.orders import OrderSpec, build_order, notional_ok
 from hyper_bot.rest_client import HyperliquidREST
-from hyper_bot.signing import sign_exchange_payload
+from hyper_bot.signing import sign_exchange_action
 
 
 def _cloid(prefix: str = "IOC") -> str:
@@ -72,20 +72,16 @@ def main() -> None:
     order = build_order(spec, am.tick_size, am.sz_decimals)
     logger.info("送信ペイロード: {}", order)
 
-    # 署名コールバック
-    def signer(body: Dict[str, Any], nonce: int) -> str:
-        priv = os.getenv("HL_PRIVATE_KEY")
-        if not priv:
-            raise RuntimeError("HL_PRIVATE_KEY が未設定です。署名実装と鍵設定を行ってください。")
-        sig = sign_exchange_payload(body, priv, nonce)
-        return sig.signature
-
+    # 署名は REST クライアントに任せる（環境変数に鍵がある場合）。
     try:
-        resp = rest.post_orders([order], signature_cb=signer)
+        resp = rest.post_orders([order])
         logger.info("/exchange 応答: {}", resp)
         if args.dms and args.dms >= 5:
-            logger.info("DMS を +{} 秒で予約します。", args.dms)
-            d = rest.schedule_cancel(args.dms, signature_cb=signer)
+            import time as _t
+
+            cancel_time_ms = int(_t.time() * 1000) + int(args.dms * 1000)
+            logger.info("DMS を {}ms で予約します。", cancel_time_ms)
+            d = rest.schedule_cancel_at(cancel_time_ms)
             logger.info("scheduleCancel 応答: {}", d)
     except NotImplementedError as e:
         logger.error("署名が未実装です: {}", e)
@@ -95,4 +91,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

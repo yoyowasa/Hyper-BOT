@@ -75,12 +75,20 @@ class WebsocketClient:
         await self._ws.send(json.dumps(payload))
 
     def add_subscription(self, channel: str, **kwargs: Any) -> None:
-        """購読メッセージを登録する（接続後に自動送信）。"""
+        """簡易 API（非推奨）。HL の実サブスク形式に合わせる場合は add_raw_subscription を使う。"""
 
-        sub = {"type": "subscribe", "channel": channel}
-        if kwargs:
-            sub.update(kwargs)
-        self._subs.append(sub)
+        # 互換レイヤ（最小限）: candle のみサポート
+        if channel == "candle":
+            symbol = kwargs.get("symbol") or kwargs.get("coin")
+            interval = kwargs.get("interval", "1h")
+            self.add_raw_subscription({"type": "candle", "coin": symbol, "interval": interval})
+        else:
+            self.add_raw_subscription({"type": channel, **kwargs})
+
+    def add_raw_subscription(self, payload: Dict[str, Any]) -> None:
+        """HL のサブスクリプションオブジェクトをそのまま登録する。"""
+
+        self._subs.append(payload)
 
     async def _send_ping(self) -> None:
         """1 回だけ ping を送り、pong を待つ。成功時は最終受信時刻を更新。"""
