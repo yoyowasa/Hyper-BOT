@@ -1,37 +1,67 @@
-Hyper_BOT スキャフォールド
+Hyper_BOT Scaffold
 
-Hyperliquid 仕様に沿った Python 最小構成です。含まれる機能:
-- ハートビート・再接続付きの REST/WS クライアント
-- 最新 100 個のノンス管理（UTC ミリ秒）
-- DMS（Dead Man’s Switch）予約ヘルパ
-- metaAndAssetCtxs・candle・funding のデータ取得
-- 特徴量スケルトン（premium、funding 移動平均、OI、ボラティリティ）
-- コスト（手数料/ファンディング/インパクト）を考慮可能なバックテスト骨格
-- Tick/Lot（szDecimals）検証と TIF/ReduceOnly を備えた注文ビルダ
+Hyperliquid の REST/WS クライアントと、データ取得・発注ユーティリティを含む Python スケルトンです。
 
-クイックスタート
+主な機能
+- REST/WS クライアント（再接続・ping/pong 心拍）
+- 署名（EIP‑712 相当）と nonce 管理（直近 100 件）
+- メタ/スナップショット/ファンディング履歴の取得と保存
+- 注文生成（Tick/桁数に応じた丸め、TIF、ReduceOnly、TP/SL grouping）
+- 簡易リスク/バックテストの補助関数
+
+要件
 - Python 3.10+
-- pip install -r requirements.txt
-- .env.example を .env にコピーして編集
+- 依存関係: `requirements.txt` または `poetry install`
 
-実行例
-- スナップショット取得: python scripts/fetch_snapshot.py --assets BTC,ETH --timeframes 1h,1d
-- WS 紙トレ: python scripts/run_ws_paper.py --channels candle --assets BTC,ETH
+セットアップ
+1) 依存のインストール
+   - `pip install -r requirements.txt`
+   - または `poetry install`
+2) 環境変数
+   - `.env.example` を `.env` にコピーして必要箇所を編集（実鍵はコミット禁止）
+   - 既定では `HL_NETWORK=testnet` を推奨
+   - 上書き用の `HL_BASE_URL` / `HL_WS_URL` を設定すると、ネットワーク既定より優先されます
+
+クイックスタート（Testnet / 読み取り系）
+- スナップショット取得: `python scripts/fetch_snapshot.py --assets BTC,ETH --timeframes 1h,1d`
+- WS 購読（ローソク足）: `python scripts/run_ws_paper.py --channels candle --assets BTC,ETH`
+
+クイックスタート（Testnet / 発注系）
+- 実注文の前に、`.env` へテスト用の `HL_PRIVATE_KEY` と `HL_ADDRESS` を設定してください
+- IOC の発注例（マーケット）:
+  - `python scripts/place_ioc_example.py --symbol BTC --side buy --size 0.001 --market`
+- TP/SL のセット例（positionTpsl）:
+  - `python scripts/place_tpsl_example.py --symbol BTC --side long --size 0.001 --px 50000 --tp 50500 --sl 49500`
+
+スモークテスト（Testnet 向け、安全なIOC確認）
+- 使い方: `scripts/smoke_test_testnet.py`
+  - 事前に `HL_NETWORK=testnet` を設定
+  - DRY RUN（発注しない）:
+    - `python scripts/smoke_test_testnet.py --symbol BTC --side buy`
+  - 実行（発注するには --confirm 必須。環境変数に鍵が必要）:
+    - `python scripts/smoke_test_testnet.py --symbol BTC --side buy --confirm`
+  - DMS（任意、n秒後にキャンセル予約）:
+    - `python scripts/smoke_test_testnet.py --symbol ETH --side sell --confirm --dms 10`
+  - 安全策:
+    - mainnet では実行不可（testnet 強制）
+    - `--confirm` がない限りは発注しません（DRY RUN）
 
 注意
-- 実注文には、hyper_bot/signing.py にて Hyperliquid 公式ドキュメント準拠の署名実装が必要です。環境変数 HL_PRIVATE_KEY/HL_ADDRESS を設定してください。
+- 本番鍵のコミット禁止（`.env` は `.gitignore` 済）
+- `HL_NETWORK` で mainnet/testnet を切替（`hyper_bot/config.py`）
+- `HL_BASE_URL` / `HL_WS_URL` を設定すると、コードはそれらを優先して利用します
 
-設定
-- HL_NETWORK=mainnet|testnet でエンドポイントを切替（config.py）
-- 手数料: config.DEFAULT_FEES
-- インパクト想定ノーション: BTC/ETH は 20k、その他は 6k（config）
-- レート制限: REST 1200/分、WS は config を参照
+テスト
+- 単体テストの実行: `pytest -q`
+- テストはネットワークに依存せず、以下を検証します
+  - 注文の丸め/ペイロード生成
+  - REST ボディ整形（署名コールバック経由）
+  - WS 購読ペイロードの整形
 
-チェックリスト（本番前）
-- 足/特徴量/目的変数の UTC 整合が取れている
-- バックテストが手数料/ファンディング/スリッページ控除後でも妥当で、PnL 符号が再現できる
-- Tick/Lot と最小 $10 の検証がテスト/ログで確認済み
-- ノンスの (T−2d, T+1d) 有効範囲と最新 100 個管理が実装されている
-- DMS 常時予約と心拍監視、WS 再接続が動作
-- isSnapshot の扱いを含むスナップショット復元が検証済み
-- cancel/cancelByCloid のバッチ戦略がレート制限に耐える
+構成
+- `hyper_bot/rest_client.py` — /info, /exchange（発注/キャンセル/DMS）
+- `hyper_bot/ws_client.py` — WS クライアント（購読、心拍、自動再接続）
+- `hyper_bot/signing.py` — 署名（EIP‑712 相当）、`hyper_bot/nonce_manager.py` — nonce 管理
+- `hyper_bot/orders.py` — 注文ユーティリティ、`hyper_bot/utils.py` — 共通関数
+- `hyper_bot/data/ingest.py` — データ取得の保存ユーティリティ
+- `scripts/` — 実行サンプル

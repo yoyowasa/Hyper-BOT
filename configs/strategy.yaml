@@ -1,0 +1,27 @@
+# Strategy config for scripts/strategy_runner_sdk.py
+
+# Symbols to trade (list or comma string)
+symbols: [BTC, ETH]
+
+# Premium absolute threshold (0.002 = 0.2%)
+threshold: 0.002
+
+# IOC slippage in basis points (50 = 0.5%)
+slip_bps: 50
+
+# Fixed size per trade; 0 => auto ~$10 notion
+size: 0.0
+
+# Decision loop poll interval (seconds)
+poll_sec: 5
+
+# Minimum seconds between trades per symbol
+min_interval_sec: 15
+
+# Dry run (true => no orders; log only)
+dry_run: false
+
+# Optional custom output directories
+# logs_dir: logs
+# runs_dir: runs
+

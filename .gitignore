@@ -1,17 +1,25 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage*
+
+# Environments
 .venv/
 venv/
-.pytest_cache/
-
-# Data/Logs
-data/
-logs/
-
-# Env
 .env
+.env.*
+!.env.example
 
-# Editors
-.vscode/
+# Build / dist
+dist/
+build/
+
+# IDE
 .idea/
+.vscode/
+
+# Data outputs
+data/
+

@@ -50,7 +50,7 @@ def build_order(spec: OrderSpec, px_tick: Optional[float], sz_decimals: int) -> 
         "s": sz,
         "r": bool(spec.reduce_only),
         "t": spec.typ,
-        "TIF": spec.tif,
+        "tif": spec.tif,
         "grouping": spec.grouping,
     }
     if px is not None:
@@ -75,3 +75,28 @@ def notional_ok(size: float, price: Optional[float], min_notional: float = 10.0)
     if price is None:
         return True
     return (abs(size) * float(price)) >= float(min_notional)
+
+
+def build_trigger_order(
+    asset_id: int,
+    is_buy: bool,
+    sz: float,
+    limit_px: float,
+    trigger_px: float,
+    tpsl: str,  # "tp" | "sl"
+    sz_decimals: int,
+) -> Dict[str, Any]:
+    """Build a ReduceOnly trigger order (TP/SL) payload.
+
+    Shapes the wire format expected by Hyperliquid for trigger orders. Uses string
+    values for numeric fields that require exact formatting on the wire.
+    """
+
+    return {
+        "a": asset_id,
+        "b": bool(is_buy),
+        "p": str(limit_px),
+        "s": str(round_size_by_decimals(sz, sz_decimals)),
+        "r": True,
+        "t": {"trigger": {"triggerPx": str(trigger_px), "isMarket": True, "tpsl": tpsl}},
+    }

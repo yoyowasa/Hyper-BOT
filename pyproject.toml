@@ -19,6 +19,9 @@ urllib3 = ">=2.2.2"
 eth-account = ">=0.10.0"
 eth-utils = ">=4.1.0"
 msgpack = ">=1.0.8"
+hyperliquid-python-sdk = ">=0.14.0"
+PyYAML = ">=6.0.2"
+python-dotenv = ">=1.0.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"

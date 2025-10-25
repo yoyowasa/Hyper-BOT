@@ -1,0 +1,49 @@
+# Full strategy configuration for strategy_runner_full_sdk.py
+
+symbol: BTC
+symbols: [BTC, ETH]
+
+# Fees and slippage assumptions (basis points)
+fee_bps: 2.5
+slippage_bps: 2
+
+risk:
+  risk_per_trade_pct: 0.003         # 0.3% of equity per trade
+  daily_loss_limit_pct: 0.01        # 1% daily stop
+  stop_atr_mult: 1.5                # ATR-based stop distance
+  take_atr_mult: 3.0                # ATR-based take profit distance
+  time_stop_sec: 900                # 15 minutes
+  equity_usd: 10000                 # fallback equity if API not available
+
+safety:
+  consecutive_error_limit: 3
+  ws_stale_sec: 5
+  cooldown_base_sec: 60
+  cooldown_max_sec: 900
+  spread_bps_max: 3
+
+signal:
+  premium_mr:
+    enabled: true
+    window_sec: 3600
+    z_entry: 2.0
+    z_exit: 0.5
+  funding_avoid:
+    enabled: true
+    ma_window: 6
+    thr_bps_per_interval: 1.0
+    block_side_minutes_before: 30
+  oi_breakout:
+    enabled: true
+    oi_ema_sec: 300
+    doi_thr_pct: 0.8
+    price_breakout_bps: 5
+
+order:
+  tif: IOC
+  partial_fill_min_pct: 0.5
+  reduce_only_exit: true
+
+logs_dir: logs
+runs_dir: runs
+
